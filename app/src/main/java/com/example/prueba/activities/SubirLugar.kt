@@ -3,6 +3,7 @@ package com.example.prueba.activities
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.ImageView
@@ -19,10 +20,11 @@ class SubirLugar : AppCompatActivity() {
 
         val imageView = findViewById<ImageView>(R.id.fotoSubida)
 
-        val compressedByteArray = intent.getByteArrayExtra("imageByteArray")
-        if (compressedByteArray != null) {
-            val decodedBitmap = BitmapFactory.decodeByteArray(compressedByteArray, 0, compressedByteArray.size)
-            val imageView = findViewById<ImageView>(R.id.imageView)
+        val imageUriString = intent.getStringExtra("imageUri")
+        if (imageUriString != null) {
+            val imageUri = Uri.parse(imageUriString)
+            val imageStream = contentResolver.openInputStream(imageUri)
+            val decodedBitmap = BitmapFactory.decodeStream(imageStream)
             imageView.setImageBitmap(decodedBitmap)
         }
 

@@ -52,6 +52,7 @@ import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.TilesOverlay
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.FileReader
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -87,7 +88,7 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
     private var marker: Marker? = null
 
     //Uri para la foto en una localizacion
-    lateinit var cameraUri: Uri
+    private var cameraUri: Uri? = null
 
     //Acà me encargo dejar todo correctamente configurado e iniciado para esta interfaz.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,6 +136,8 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
 
         direccion = "North"
 
+
+
         //Listener para el boto adicionar, y tomar una foto
 
         binding.subirFoto.setOnClickListener{
@@ -145,16 +148,37 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    val getContentCamera = registerForActivityResult(ActivityResultContracts.TakePicture(),{
 
-        if(it){
-            loadImage(cameraUri)
+    val getContentCamera = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            // Save the image to internal storage
+            val savedImageUri = saveImageToInternalStorage(cameraUri!!)
+            // Pass the URI of the saved image to the next activity
+            startNextActivity(savedImageUri)
         }
-    })
+    }
 
-    private fun loadImage(cameraUri: Uri) {
+    private fun startNextActivity(savedImageUri: Uri) {
+        val intent = Intent(this, SubirLugar::class.java)
+        intent.putExtra("imageUri", savedImageUri.toString())
+        startActivity(intent)
+    }
 
-        val imageStream = getContentResolver().openInputStream(cameraUri)
+    private fun saveImageToInternalStorage(cameraUri: Uri): Uri {
+        val inputStream = contentResolver.openInputStream(cameraUri)
+        val file = File(filesDir, "captured_image.jpg")
+        val outputStream = FileOutputStream(file)
+        inputStream?.use { input ->
+            outputStream.use { output ->
+                input.copyTo(output)
+            }
+        }
+        return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+    }
+
+    private fun loadImage(cameraUri: Uri?) {
+
+        val imageStream = cameraUri?.let { getContentResolver().openInputStream(it) }
         val bitmap = BitmapFactory.decodeStream(imageStream)
         val compressedByteArray = compressBitmapToByteArray(bitmap, 100)
 
@@ -329,8 +353,12 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
                         accelerationZ * accelerationZ).toDouble()
             )
 
+            val formattedAccelerationMagnitude = String.format("%.2f", accelerationMagnitude)
+
             val direccionTextView = findViewById<TextView>(R.id.aceleracion)
             direccionTextView.text = accelerationMagnitude.toString()
+
+            direccionTextView.text = formattedAccelerationMagnitude
 
 
 
