@@ -1,11 +1,13 @@
 package com.example.prueba.activities
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import com.example.prueba.R
@@ -25,9 +27,11 @@ class SubirLugar : AppCompatActivity() {
 
         val latitudText = findViewById<TextView>(R.id.latitud)
         val longitudeText = findViewById<TextView>(R.id.longitud)
+        val formattedLatitud = String.format("%.2f", latitude)
+        val formattedLongitud = String.format("%.2f", longitude)
 
-        latitudText.text = "Latitude: $latitude"
-        longitudeText.text = "Longitude: $longitude"
+        latitudText.text = "      Latitude: $formattedLatitud"
+        longitudeText.text = "      Longitude: $formattedLongitud"
 
         val imageUriString = intent.getStringExtra("imageUri")
         if (imageUriString != null) {
@@ -37,6 +41,22 @@ class SubirLugar : AppCompatActivity() {
             imageView.setImageBitmap(decodedBitmap)
         }
 
+        val usuarioEditText = findViewById<EditText>(R.id.usuario)
+        val userText = usuarioEditText.text.toString()
+
+       binding.aceptar.setOnClickListener() {
+
+           val intent = Intent(this, HomeActivity::class.java)
+           intent.putExtra("nombre", userText)
+           intent.putExtra("latitude", latitude)
+           intent.putExtra("longitude", longitude)
+           startActivity(intent)
+       }
+
+        binding.rechazar.setOnClickListener(){
+
+            startActivity(Intent(baseContext, HomeActivity::class.java))
+        }
 
 
 

@@ -95,6 +95,7 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var userGeoPoint: GeoPoint
     private lateinit var direccion: String
     private var marker: Marker? = null
+    private val predefinedMarkers = mutableListOf<Marker>()
 
     //Acà me encargo dejar todo correctamente configurado e iniciado para esta interfaz.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,6 +125,13 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
         searchButton.setOnClickListener {
             val address = addressEditText.text.toString()
             searchLocation(address)
+
+            val foundLocation = searchMarkers.any { it.title == address }
+
+            // Si no esta, por nombre en el mapa, buscar nombre puesto por usuario
+            if (!foundLocation) {
+                searchPredefinedMarkerByName(address)
+            }
         }
         // Finalmente aquì configuro un administrador de carreteras, ajusto el zoom del mapa y obtengo la
         // ubicación del usuario si es que ya tiene permiso mi app para ello, ademàs, preparo el botón "showRouteButton" para mostrar
@@ -147,6 +155,15 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             val file = File(getFilesDir(), "picFromCamera")
             cameraUri = FileProvider.getUriForFile(baseContext, baseContext.packageName + ".fileprovider", file)
             getContentCamera.launch(cameraUri)
+        }
+
+        val intent = intent
+        if (intent.hasExtra("latitude") && intent.hasExtra("longitude")) {
+            val latitude = intent.getDoubleExtra("latitude", 0.0)
+            val longitude = intent.getDoubleExtra("longitude", 0.0)
+            val string = intent.getStringExtra("nombre")
+
+            addPointOfInterest(latitude,longitude,string!!)
         }
     }
 
@@ -526,7 +543,7 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
                     Toast.makeText(this, distanceMessage, Toast.LENGTH_SHORT).show()
                     map.controller.animateTo(geoPoint)
                 } else {
-                    Toast.makeText(this, "Dirección no encontrada", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Buscando localizacion puesta por los usarios", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 Toast.makeText(this, "No se pudo obtener la ubicación actual", Toast.LENGTH_SHORT).show()
@@ -722,9 +739,10 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
         addPointOfInterest(4.5921, -74.0746, "Plaza de Bolívar")
         addPointOfInterest(4.6477, -74.0839, "Jardín Botánico")
         addPointOfInterest(4.6610, -74.0937, "Parque Simón Bolívar")
+        addPointOfInterest(4.6512, -74.0939, "Nuestra Ruta")
 
         // Registra clics en los marcadores
-        for (marker in userLocationMarkers) {
+        for (marker in predefinedMarkers) {
             marker.setOnMarkerClickListener { _, _ ->
                 // Obtén la ubicación del marcador seleccionado
                 val destination = GeoPoint(marker.position.latitude, marker.position.longitude)
@@ -742,7 +760,29 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
     private fun addPointOfInterest(latitude: Double, longitude: Double, title: String) {
         val poiGeoPoint = GeoPoint(latitude, longitude)
         val marker = createMarker(poiGeoPoint, title, R.drawable.punto_ruta)
-        userLocationMarkers.add(marker)
+        predefinedMarkers.add(marker)
         map.overlays.add(marker)
     }
+
+    private fun searchPredefinedMarkerByName(name: String) {
+        for (marker in predefinedMarkers) {
+            if (marker.title == name) {
+                // Toma la locacion por el nombre definido por el usuario
+                val location = GeoPoint(marker.position.latitude, marker.position.longitude)
+
+                // Dibuja la ruta
+                val userLocation = userLocationMarkers.firstOrNull()?.position
+                if (userLocation != null) {
+                    drawRoute(userLocation, location)
+                }
+
+                // Se va a la ruta donde esta el usuario
+                map.controller.animateTo(location)
+
+                // Exit the loop once a matching marker is found.
+                break
+            }
+        }
+    }
+
 }
