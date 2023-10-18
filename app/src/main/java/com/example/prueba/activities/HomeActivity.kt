@@ -165,6 +165,30 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
 
             addPointOfInterest(latitude,longitude,string!!)
         }
+
+        //Adicion de botones para navegacion
+
+        binding.perfil.setOnClickListener(){
+
+            startActivity(Intent(baseContext,PerfilActivity::class.java))
+        }
+
+        binding.tiendaPuntos.setOnClickListener(){
+
+            startActivity(Intent(baseContext,PuntosActivity::class.java))
+        }
+
+        binding.homeButton.setOnClickListener(){
+
+            startActivity(Intent(baseContext, LoginActivity::class.java))
+        }
+
+        binding.notificaciones.setOnClickListener(){
+
+            startActivity(Intent(baseContext, NotificacionesActivity::class.java))
+        }
+
+
     }
 
     val getContentCamera = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -357,6 +381,36 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             direccionTextView.text = accelerationMagnitude.toString()
 
             direccionTextView.text = formattedAccelerationMagnitude
+
+            if(accelerationMagnitude > 14){
+
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    val userLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                    if (userLocation != null) {
+                        val proximityRadius = 5.0
+
+                        val userLatitude = userLocation.latitude
+                        val userLongitude = userLocation.longitude
+
+                        if(searchPredefinedMarkerByCoordinates(userLatitude, userLongitude)){
+
+                            Toast.makeText(this, "Felicidades, has encontrado una bella obra de arte", Toast.LENGTH_SHORT).show()
+                        }else{
+
+                            Toast.makeText(this,"Sigue buscando", Toast.LENGTH_SHORT).show()
+                        }
+
+
+                    }
+                    }
+
+
+
+
+
+
+
+            }
 
 
         }
@@ -784,5 +838,40 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             }
         }
     }
+
+    private fun searchPredefinedMarkerByCoordinates(latitude: Double, longitude: Double): Boolean {
+        var userLocationNotNull = false
+
+        val proximityRadius = 5.0
+
+        for (marker in predefinedMarkers) {
+            val markerLatitude = marker.position.latitude
+            val markerLongitude = marker.position.longitude
+            val latitudeWithinRange = (markerLatitude >= (latitude - proximityRadius)) && (markerLatitude <= (latitude + proximityRadius))
+            val longitudeWithinRange = (markerLongitude >= (longitude - proximityRadius)) && (markerLongitude <= (longitude + proximityRadius))
+            if (latitudeWithinRange && longitudeWithinRange) {
+                // Toma la locación por las coordenadas proporcionadas
+                val location = GeoPoint(latitude, longitude)
+
+
+                // Dibuja la ruta
+                val userLocation = userLocationMarkers.firstOrNull()?.position
+                if (userLocation != null) {
+                    drawRoute(userLocation, location)
+                    userLocationNotNull = true
+                }
+
+                // Se va a la locación donde está el usuario
+                map.controller.animateTo(location)
+
+                // Exit the loop once a matching marker is found.
+                break
+            }
+        }
+
+        return userLocationNotNull
+    }
+
+
 
 }
