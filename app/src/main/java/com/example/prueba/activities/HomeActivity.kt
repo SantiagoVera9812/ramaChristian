@@ -5,10 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.Drawable
+import androidx.lifecycle.ViewModelProvider
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -20,12 +19,17 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy
 import android.util.Log
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +38,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.drawable.toDrawable
 import com.example.prueba.databinding.ActivityHomeBinding
 import com.example.prueba.R
 import com.google.android.gms.maps.model.LatLng
@@ -50,14 +55,18 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.TilesOverlay
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileReader
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
+private lateinit var userGeoPoint: GeoPoint
+private lateinit var direccion: String
+private var marker: Marker? = null
 
+//Uri para la foto en una localizacion
+private var cameraUri: Uri? = null
 class HomeActivity : AppCompatActivity(), SensorEventListener {
     // Acà hago la inicializaciòn de todas las variables necesarias para esta interfaz.
     private val MIN_DISTANCE_FOR_UPDATE = 15.0
@@ -87,15 +96,12 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var direccion: String
     private var marker: Marker? = null
 
-    //Uri para la foto en una localizacion
-    private var cameraUri: Uri? = null
-
     //Acà me encargo dejar todo correctamente configurado e iniciado para esta interfaz.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        // Acà cargo la configuraciòn dentro del mapa.
+        // Acà cargo la dentro del mapa.
         Configuration.getInstance().load(
             this,
             androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
@@ -131,14 +137,10 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             // Acà llamo a la función para mostrar la ruta basada en los registros de la ubicaciòn ubicación.
             showLocationRoute()
         }
-        //INicializacion de algunas variables
+
         userGeoPoint = GeoPoint(4.62, -74.07)
 
         direccion = "North"
-
-
-
-        //Listener para el boto adicionar, y tomar una foto
 
         binding.subirFoto.setOnClickListener{
 
@@ -147,7 +149,6 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             getContentCamera.launch(cameraUri)
         }
     }
-
 
     val getContentCamera = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) {
@@ -159,9 +160,24 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun startNextActivity(savedImageUri: Uri) {
-        val intent = Intent(this, SubirLugar::class.java)
-        intent.putExtra("imageUri", savedImageUri.toString())
-        startActivity(intent)
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (location != null) {
+                val userGeoPoint = GeoPoint(location.latitude, location.longitude)
+                val intent = Intent(this, SubirLugar::class.java)
+                intent.putExtra("latitude", location.latitude)
+                intent.putExtra("longitude", location.longitude)
+                intent.putExtra("imageUri", savedImageUri.toString())
+                startActivity(intent)
+
+            }
+
+        }
     }
 
     private fun saveImageToInternalStorage(cameraUri: Uri): Uri {
@@ -174,34 +190,6 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             }
         }
         return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-    }
-
-    private fun loadImage(cameraUri: Uri?) {
-
-        val imageStream = cameraUri?.let { getContentResolver().openInputStream(it) }
-        val bitmap = BitmapFactory.decodeStream(imageStream)
-        val compressedByteArray = compressBitmapToByteArray(bitmap, 100)
-
-        val intent = Intent(this, SubirLugar::class.java)
-        intent.putExtra("imageByteArray", compressedByteArray)
-        startActivity(intent)
-
-    }
-
-    fun compressBitmapToByteArray(bitmap: Bitmap, maxImageSize: Int): ByteArray {
-        val maxByteSize = maxImageSize * 1024 // Convert kilobytes to bytes
-        val stream = ByteArrayOutputStream()
-        var quality = 100 // Maximum quality
-
-        do {
-            // Compress the bitmap with the current quality level
-            stream.reset() // Reset the stream to clear any previous data
-            bitmap.compress(Bitmap.CompressFormat.PNG, quality, stream)
-            quality -= 5 // Reduce the quality by 5 (adjust as needed)
-
-        } while (stream.size() > maxByteSize && quality > 0)
-
-        return stream.toByteArray()
     }
 
     // Este método se llama cuando la actividad pasa a primer plano y realizo las siguientes acciones:
@@ -233,6 +221,10 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
                 // desactivada.
             }
             showUserLocation()
+
+            // Llama a la función para agregar marcadores predefinidos
+            addPredefinedMarkers()
+
             // Acà verifico si hay un destino en la barra de búsqueda (si se ha presionado en el mapa o buscado en la barra de busqueda).
             if (searchMarkers.isNotEmpty()) {
                 val destination = searchMarkers.firstOrNull()?.position
@@ -277,7 +269,6 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             )
         }
     }
-
     // Este método se llama cuando se obtiene una respuesta a una solicitud de permisos, ademàs, compruebo si
     // el usuario otorgó o denegó el permiso de ubicación y actúa en consecuencia.
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -308,22 +299,14 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
         }
 
         if(event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-
-
             val rotationMatrix = FloatArray(9)
             val orientationValues = FloatArray(3)
-
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
             SensorManager.getOrientation(rotationMatrix, orientationValues)
-
             val azimuthRadians = orientationValues[0]
-
             val azimuthDegrees = Math.toDegrees(azimuthRadians.toDouble()).toFloat()
-
             val adjustedAzimuth = if (azimuthDegrees < 0) azimuthDegrees + 360 else azimuthDegrees
-
             direccion = mapHeadingToDirection(adjustedAzimuth)
-
             val direccionTextView = findViewById<TextView>(R.id.direccion)
             val direccionTextView2 = findViewById<TextView>(R.id.orientacion)
             direccionTextView.text = direccion
@@ -345,8 +328,6 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             val accelerationX = event.values[0]
             val accelerationY = event.values[1]
             val accelerationZ = event.values[2]
-
-
             val accelerationMagnitude = Math.sqrt(
                 (accelerationX * accelerationX +
                         accelerationY * accelerationY +
@@ -359,7 +340,6 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
             direccionTextView.text = accelerationMagnitude.toString()
 
             direccionTextView.text = formattedAccelerationMagnitude
-
 
 
         }
@@ -736,7 +716,33 @@ class HomeActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private fun addPredefinedMarkers() {
+        addPointOfInterest(4.5981, -74.0755, "Museo del Oro")
+        addPointOfInterest(4.6037, -74.0666, "Monserrate")
+        addPointOfInterest(4.5921, -74.0746, "Plaza de Bolívar")
+        addPointOfInterest(4.6477, -74.0839, "Jardín Botánico")
+        addPointOfInterest(4.6610, -74.0937, "Parque Simón Bolívar")
 
+        // Registra clics en los marcadores
+        for (marker in userLocationMarkers) {
+            marker.setOnMarkerClickListener { _, _ ->
+                // Obtén la ubicación del marcador seleccionado
+                val destination = GeoPoint(marker.position.latitude, marker.position.longitude)
+                // Obtén la ubicación actual
+                val userLocation = userLocationMarkers.firstOrNull()?.position
+                if (userLocation != null) {
+                    // Dibuja la ruta desde la ubicación actual al destino
+                    drawRoute(userLocation, destination)
+                }
+                true // Devuelve true para indicar que has manejado el click
+            }
+        }
+    }
 
-
+    private fun addPointOfInterest(latitude: Double, longitude: Double, title: String) {
+        val poiGeoPoint = GeoPoint(latitude, longitude)
+        val marker = createMarker(poiGeoPoint, title, R.drawable.punto_ruta)
+        userLocationMarkers.add(marker)
+        map.overlays.add(marker)
+    }
 }

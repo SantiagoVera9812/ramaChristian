@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.ImageView
+import android.widget.TextView
 import com.example.prueba.R
 import com.example.prueba.databinding.ActivitySubirLugarBinding
 
@@ -17,8 +18,16 @@ class SubirLugar : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivitySubirLugarBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        val latitude = intent.getDoubleExtra("latitude", 0.0) // 0.0 is a default value if the extra is not found
+        val longitude = intent.getDoubleExtra("longitude", 0.0)
 
         val imageView = findViewById<ImageView>(R.id.fotoSubida)
+
+        val latitudText = findViewById<TextView>(R.id.latitud)
+        val longitudeText = findViewById<TextView>(R.id.longitud)
+
+        latitudText.text = "Latitude: $latitude"
+        longitudeText.text = "Longitude: $longitude"
 
         val imageUriString = intent.getStringExtra("imageUri")
         if (imageUriString != null) {
@@ -27,6 +36,8 @@ class SubirLugar : AppCompatActivity() {
             val decodedBitmap = BitmapFactory.decodeStream(imageStream)
             imageView.setImageBitmap(decodedBitmap)
         }
+
+
 
 
     }
